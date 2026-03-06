@@ -353,8 +353,12 @@ Result oafInitAndRun(void)
 	return res;
 }
 
+static bool g_botBacklightOn = true;
+
 static void updateStats(void)
 {
+	if(!g_botBacklightOn) return;
+
 	static u32 frameCount = 0;
 	if(frameCount % 600 != 0)
 	{
@@ -383,6 +387,7 @@ void oafUpdate(void)
 {
 	const u32 *const maps = g_oafConfig.buttonMaps;
 	const u32 kHeld = hidKeysHeld();
+	const u32 kDown = hidKeysDown();
 	u16 pressed = 0;
 	for(unsigned i = 0; i < 10; i++)
 	{
@@ -390,6 +395,14 @@ void oafUpdate(void)
 			pressed |= 1u<<i;
 	}
 	LGY11_setInputState(pressed);
+
+	// Toggle bottom screen backlight with Y + TOUCH.
+	if(kDown == KEY_TOUCH && kHeld == (KEY_Y | KEY_TOUCH))
+	{
+		g_botBacklightOn = !g_botBacklightOn;
+		if(g_botBacklightOn) GFX_powerOnBacklight(GFX_BL_BOT);
+		else                 GFX_powerOffBacklight(GFX_BL_BOT);
+	}
 
 	CODEC_runHeadphoneDetection();
 	updateBacklight();
