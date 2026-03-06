@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "types.h"
 #include "util.h"
 #include "arm11/fast_rom_padding.h"
@@ -36,6 +37,7 @@
 #include "drivers/lgy_common.h"
 #include "arm11/oaf_video.h"
 #include "arm11/drivers/lgy11.h"
+#include "arm11/console.h"
 #include "kernel.h"
 #include "kevent.h"
 
@@ -351,6 +353,32 @@ Result oafInitAndRun(void)
 	return res;
 }
 
+static void updateStats(void)
+{
+	static u32 frameCount = 0;
+	if(frameCount % 600 != 0)
+	{
+		frameCount++;
+		return;
+	}
+
+	u8 battery = MCU_getBatteryLevel();
+	RtcTimeDate td;
+	MCU_getRtcTimeDate(&td);
+
+	// Convert BCD to decimal.
+	int hour = (td.hour / 16 * 10) + (td.hour % 16);
+	int min = (td.min / 16 * 10) + (td.min % 16);
+
+	// If this isn't the first print, move the cursor up 1 line to the start of the stats block.
+	if(frameCount > 0) ee_printf("\x1b[A\r");
+
+	ee_printf("Time: %02d:%02d\nBattery: %3d%%", hour, min, battery);
+	GFX_flushBuffers();
+
+	frameCount++;
+}
+
 void oafUpdate(void)
 {
 	const u32 *const maps = g_oafConfig.buttonMaps;
@@ -365,6 +393,7 @@ void oafUpdate(void)
 
 	CODEC_runHeadphoneDetection();
 	updateBacklight();
+	updateStats();
 	waitForEvent(g_frameReadyEvent);
 	clearEvent(g_frameReadyEvent);
 }
