@@ -353,7 +353,7 @@ Result oafInitAndRun(void)
 	return res;
 }
 
-static bool g_botBacklightOn = true;
+static bool g_botBacklightOn = false;
 
 static void updateStats(void)
 {
@@ -374,8 +374,15 @@ static void updateStats(void)
 	int hour = (td.hour / 16 * 10) + (td.hour % 16);
 	int min = (td.min / 16 * 10) + (td.min % 16);
 
-	// If this isn't the first print, move the cursor up 1 line to the start of the stats block.
-	if(frameCount > 0) ee_printf("\x1b[A\r");
+	if(frameCount == 0)
+	{
+		ee_printf("Y + Touch: Toggle bottom screen\n");
+	}
+	else
+	{
+		// Move up 1 line to the start of the stats block (Time line).
+		ee_printf("\x1b[A\r");
+	}
 
 	ee_printf("Time: %02d:%02d\nBattery: %3d%%", hour, min, battery);
 	GFX_flushBuffers();

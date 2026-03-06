@@ -444,10 +444,13 @@ static KHandle setupFrameCapture(const u8 scaler, const bool colorCorrectionEnab
 
 KHandle OAF_videoInit(void)
 {
-	// Don't force black and turn the backlight off on the bottom screen.
+	// Don't force black on the bottom screen.
 	GFX_setForceBlack(false, false);
+
+	// Turn off the backlight on the bottom screen by default.
+	// It can be toggled on later during gameplay.
 	if(MCU_getSystemModel() != SYS_MODEL_2DS)
-		GFX_powerOnBacklight(GFX_BL_BOT);
+		GFX_powerOffBacklight(GFX_BL_BOT);
 
 	// Initialize frame capture.
 	const u8 scaler = g_oafConfig.scaler;
