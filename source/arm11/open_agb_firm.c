@@ -354,15 +354,15 @@ Result oafInitAndRun(void)
 }
 
 static bool g_botBacklightOn = false;
+static u32 g_statsFrameCount = 0;
 
 static void updateStats(void)
 {
 	if(!g_botBacklightOn) return;
 
-	static u32 frameCount = 0;
-	if(frameCount % 600 != 0)
+	if(g_statsFrameCount % 600 != 0)
 	{
-		frameCount++;
+		g_statsFrameCount++;
 		return;
 	}
 
@@ -374,7 +374,7 @@ static void updateStats(void)
 	int hour = (td.hour / 16 * 10) + (td.hour % 16);
 	int min = (td.min / 16 * 10) + (td.min % 16);
 
-	if(frameCount == 0)
+	if(g_statsFrameCount == 0)
 	{
 		ee_printf("Y + Touch: Toggle bottom screen\n");
 	}
@@ -387,7 +387,7 @@ static void updateStats(void)
 	ee_printf("Time: %02d:%02d\nBattery: %3d%%", hour, min, battery);
 	GFX_flushBuffers();
 
-	frameCount++;
+	g_statsFrameCount++;
 }
 
 void oafUpdate(void)
@@ -407,8 +407,13 @@ void oafUpdate(void)
 	if(kDown == KEY_TOUCH && kHeld == (KEY_Y | KEY_TOUCH))
 	{
 		g_botBacklightOn = !g_botBacklightOn;
-		if(g_botBacklightOn) GFX_powerOnBacklight(GFX_BL_BOT);
-		else                 GFX_powerOffBacklight(GFX_BL_BOT);
+		if(g_botBacklightOn)
+		{
+			GFX_powerOnBacklight(GFX_BL_BOT);
+			if(g_statsFrameCount % 600 != 0)
+				g_statsFrameCount = (g_statsFrameCount / 600 + 1) * 600;
+		}
+		else GFX_powerOffBacklight(GFX_BL_BOT);
 	}
 
 	CODEC_runHeadphoneDetection();
