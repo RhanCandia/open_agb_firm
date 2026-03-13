@@ -335,7 +335,7 @@ Result oafInitAndRun(void)
 
 				// Setup button overrides.
 				const u32 *const maps = g_oafConfig.buttonMaps;
-				u16 overrides = 0;
+				u16 overrides = 0xF; // Force override for A, B, SELECT, START to allow the macro to work.
 				for(unsigned i = 0; i < 10; i++)
 					if(maps[i] != 0) overrides |= 1u<<i;
 				LGY11_selectInput(overrides);
@@ -355,6 +355,36 @@ Result oafInitAndRun(void)
 
 static bool g_botBacklightOn = false;
 static u32 g_statsFrameCount = 0;
+
+typedef struct {
+	u16 delay_frames;
+	u16 button_mask;
+} MacroStep;
+
+static const MacroStep s_macroSteps[] = {
+	{ 240, 1 << 0 }, // 4.0s -> A
+	{ 30,  1 << 0 }, // 0.5s -> A
+	{ 30,  1 << 0 }, // 0.5s -> A
+	{ 180, 1 << 0 }, // 3.0s -> A
+	{ 120, 1 << 0 }, // 2.0s -> A
+	{ 90,  1 << 0 }, // 1.5s -> A
+	{ 72,  1 << 0 }, // 1.2s -> A
+	{ 72,  1 << 0 }, // 1.2s -> A
+	{ 72,  1 << 0 }, // 1.2s -> A
+	{ 72,  1 << 0 }, // 1.2s -> A
+	{ 270, 1 << 1 }, // 4.5s -> B
+	{ 120, 1 << 0 }, // 2.0s -> A
+	{ 240, 1 << 3 }, // 4.0s -> START
+	{ 30,  1 << 0 }, // 0.5s -> A
+	{ 90,  1 << 0 }, // 1.5s -> A
+	{ 30,  1 << 0 }, // 0.5s -> A
+};
+
+#define MACRO_STEP_COUNT (sizeof(s_macroSteps) / sizeof(s_macroSteps[0]))
+#define BUTTON_HOLD_FRAMES 10
+
+static int s_currentMacroStep = -1;
+static int s_macroFrameCount = 0;
 
 static void updateStats(void)
 {
@@ -398,9 +428,51 @@ void oafUpdate(void)
 	u16 pressed = 0;
 	for(unsigned i = 0; i < 10; i++)
 	{
-		if((kHeld & maps[i]) != 0)
+		u32 map = maps[i];
+		// If the button is overridden for the macro but has no custom mapping,
+		// we must manually pass through the default 3DS physical button.
+		if(map == 0 && i < 4)
+			map = 1u << i; // KEY_A, KEY_B, KEY_SELECT, KEY_START match bits 0-3.
+
+		if(map != 0 && (kHeld & map) != 0)
 			pressed |= 1u<<i;
 	}
+
+	// Soft reboot (A + B + SELECT + START) macro with Y + D-DOWN.
+	if((kHeld & (KEY_Y | KEY_DDOWN)) == (KEY_Y | KEY_DDOWN))
+	{
+		pressed |= 0xF;
+		// Trigger sequence start.
+		if(s_currentMacroStep == -1)
+		{
+			s_currentMacroStep = 0;
+			s_macroFrameCount = 0;
+		}
+	}
+
+	// Process the macro sequence.
+	if(s_currentMacroStep >= 0)
+	{
+		s_macroFrameCount++;
+		const MacroStep *step = &s_macroSteps[s_currentMacroStep];
+
+		// After the specified delay, press the button.
+		if(s_macroFrameCount > step->delay_frames)
+		{
+			pressed |= step->button_mask;
+
+			// Hold the button for 10 frames before moving to the next step.
+			if(s_macroFrameCount >= (step->delay_frames + BUTTON_HOLD_FRAMES))
+			{
+				s_currentMacroStep++;
+				s_macroFrameCount = 0;
+
+				if((size_t)s_currentMacroStep >= MACRO_STEP_COUNT)
+					s_currentMacroStep = -1;
+			}
+		}
+	}
+
 	LGY11_setInputState(pressed);
 
 	// Toggle bottom screen backlight with Y + TOUCH.
